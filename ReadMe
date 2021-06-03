@@ -1,0 +1,30 @@
+Ravallion Replication
+
+Estimate consumption model for the households included in the sample
+y = a + bX + e
+- For y, use household-consumption (log consumption per capita) (mean = 623659)
+- For X, use living conditions, basic consumer durables or assets, demographic variables (size and composition) and attributes of household head. 
+
+
+Predict PMT score for all households based on:
+
+y_hat = a_hat + b_hat X
+
+
+Data:
+Exclude households with missing weights or missing values for the variables included in the PMT regressions. Then N = 2671 (or 2650?).
+
+Variables:
+Housing - water (piped, well), toilet (flush, pit), floor (natural, rudimentary, finished), wall (natural, rudimentary, finished), roof (natural, rudimentary, finished), members per room, kitchen room, fuel (electric or gas, charcoal or coal, wood), electricity
+
+Household Assets - radio, television, firdge, bicycle, motorbike, car, telephone, mobile phone, computer, video, stove (any), sewing machine, aircon, iron, satellite, generator, own house, urban
+
+Household Characteristics - household head information (age, female, at least primary educ, at least secondary educ, ever married, married, divorced or separated, widow, never married, works for wage or salary, self employed in own enterprise, self employed in own farm, works daily), max educ in household is at least primary, max educ in household is at least secondary, household size, muslim, christian
+
+Household composition (shares) -
+0to5 female/male, 6to14 female/male, 15to64 female/male, 65+ female/male, widows, disabled female/male, orphan female/male
+
+
+Adjust means by household weights.
+Missing variables are left blank.
+Consumption is adjusted spatially and is in per capita terms.
