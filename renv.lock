@@ -422,6 +422,7 @@
       "Repository": "CRAN",
       "Hash": "26fa77e707223e1ce042b2b5d09993dc"
     },
+<<<<<<< HEAD
     "minqa": {
       "Package": "minqa",
       "Version": "1.2.4",
@@ -436,6 +437,8 @@
       "Repository": "CRAN",
       "Hash": "a4b659bd0528226724d55034f11ed7cb"
     },
+=======
+>>>>>>> ec9017b61f4dec59fe5eaba267f0c198f614e537
     "modelr": {
       "Package": "modelr",
       "Version": "0.1.8",
@@ -457,6 +460,7 @@
       "Repository": "CRAN",
       "Hash": "35de1ce639f20b5e10f7f46260730c65"
     },
+<<<<<<< HEAD
     "numDeriv": {
       "Package": "numDeriv",
       "Version": "2016.8-1.1",
@@ -464,6 +468,8 @@
       "Repository": "CRAN",
       "Hash": "df58958f293b166e4ab885ebcad90e02"
     },
+=======
+>>>>>>> ec9017b61f4dec59fe5eaba267f0c198f614e537
     "openssl": {
       "Package": "openssl",
       "Version": "1.4.4",
@@ -639,6 +645,7 @@
       "Repository": "CRAN",
       "Hash": "0759e6b6c0957edb1311028a49a35e76"
     },
+<<<<<<< HEAD
     "survey": {
       "Package": "survey",
       "Version": "4.0",
@@ -653,6 +660,8 @@
       "Repository": "CRAN",
       "Hash": "f4d706b25d640dbaeb56d9c9b6ce9a22"
     },
+=======
+>>>>>>> ec9017b61f4dec59fe5eaba267f0c198f614e537
     "sys": {
       "Package": "sys",
       "Version": "3.4",
