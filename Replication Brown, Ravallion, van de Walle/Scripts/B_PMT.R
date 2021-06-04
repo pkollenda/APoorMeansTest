@@ -1,6 +1,6 @@
 # Load data and packages
 pacman::p_load(tidyverse, estimatr, texreg)
-households <- readRDS("Data/prepared/households")
+households <- readRDS("Replication Brown, Ravallion, van de Walle/Data/prepared/households")
 
 # Basic PMT
 basicpmt <- paste("toilet_flush", "toilet_pit", "floor_finished", "wall_finished", 
@@ -40,12 +40,13 @@ screenreg(bigpmt, omit.coef = "region|month|head_age_fct|hhsize",
 
 
 
-
-# Plot residuals against log real consumption per capita (Figure 2, page 117)
+# Save dataset with actual outcomes and fitted values
 bpmt <- tibble(logyhat = basicpmt$fitted.values, yhat = exp(logyhat),
                logy = unlist(model.frame(basicpmt)[basicpmt$outcome]), y = exp(logy),
                w = households$mult / sum(households$mult),
                resid = logy - logyhat)  
+
+# Plot residuals against log real consumption per capita (Figure 2, page 117)
 ggplot(bpmt, aes(x = logy, y = resid)) + 
   geom_point(alpha = 0.4) +
   geom_hline(yintercept = 0, color = "gray", linetype = "dashed") +

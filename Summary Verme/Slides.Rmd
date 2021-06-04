@@ -1,0 +1,243 @@
+---
+title: "Which Model for Poverty Prediction"
+subtitle: "(Working Paper by Paolo Verme 2020)"
+author: "Philipp Kollenda"
+institute: "Vrije Universiteit Amsterdam"
+date: "11 June 2021 (last updated: `r format(Sys.Date(), '%d %B %Y')`)"
+output: 
+  xaringan::moon_reader:
+    css: [default, metropolis]
+    nature: 
+      countIncrementalSlides: false
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+pacman::p_load(xaringan, tidyverse, estimatr, latex2exp)
+```
+
+```{r data, include = FALSE}
+data = readRDS("Data/households") %>% 
+  # Exclude three outliers (top 0.1 percent) in terms of income, probably a data error?
+  filter(cpp < quantile(cpp, 0.999))
+
+set.seed(1896)
+index = sample(seq_len(nrow(data)), size = round(nrow(data)*0.5))
+
+# Training data
+data_train = data[index, ] %>% 
+  # Create variable for the weight, such that weights sum to 1
+  mutate(w = mult / sum(mult))
+
+data_test = data[-index, ] %>% 
+  # Create variable for the weight, such that weights sum to 1
+  mutate(w = mult / sum(mult))
+```
+
+## Why Targeting 
+.pull-left[
+```{r plot_povertylines, echo=FALSE, warning=FALSE, fig.dim=c(5, 5)}
+# Ideas. Make this a shiny plot and change the poverty line and the graph.
+
+my_quantile <- function(x, w, p){
+  oo <- order(x)
+  cum.w <- cumsum(w[oo])/sum(w)
+  cdf <- approxfun(cum.w, x[oo], yleft = min(x), yright = max(x), ties = min)
+  return(cdf(p))
+}
+
+q = 0.2
+z = my_quantile(data_train$cpp / 12, w = data_train$w, p = q)
+dens = density(data_train$cpp / 12, weights = data_train$w)
+
+plot1 <- ggplot(data_train) +
+  geom_density(aes(x = cpp / 12, weight = w), color = "black") +
+  geom_vline(xintercept = z, color = "red", alpha = 0.8) +
+  geom_ribbon(data = subset(with(dens, data.frame(x,y)), x < z), aes(x = x, ymax = y), ymin = 0, fill = "gray", alpha = 0.5) +
+  annotate(geom = "text", x = z + 1000, y = 0.00001, label = parse(text = TeX('$F(z) = \\sum(y_i \\leq z)$')), hjust = "inward") +
+  annotate(geom = "text", x = z + 1000, y = 0.000008, label = paste0("F(", format(z, digits = 1, big.mark = ","), ") = ", q), color = "red", hjust = "inward") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(x = "Monthly per capita consumption",
+       y = NULL) +
+  coord_cartesian(xlim = c(0, 100000)) +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        axis.text.y = element_blank())
+
+plot1
+```
+]
+
+.pull-right[
+- Determine eligibility for a program.
+- Which measure? Which cut-off?
+
+> Consumption (Brown et al.; Verme), Rankings (Martin), ...
+> Absolute poverty (line) or relative poverty (rate)
+
+- The relevant measure may not be available for the entire sample `r emo::ji("cry")`
+]
+
+---
+
+.pull-left[
+# How it started 
+```{r plot_povertylines2, echo=FALSE, fig.dim=c(5,5), warning=FALSE}
+# Linear regression with robust standard errors (Stata style), not yet clustered at PSU level (where is PSU variable in WB data?)
+basicpmt <- paste("toilet_flush", "toilet_pit", "floor_finished", "wall_finished", 
+                  "roof_finished", "fuel_electric_gas", "fuel_coal", "urban",
+                  "head_age_fct", "head_female", "head_educ_primary", "head_educ_secondary", 
+                  "head_divorced", "head_widow", "head_work_salary", "head_work_selfemployed",
+                  "shares_f_5", "shares_m_5", "shares_f_14", "shares_m_14", "shares_f_65", "shares_m_65",
+                  "hhsize_fct", "month", "region",
+                  sep = " + ")
+basicpmt <- formula(paste("log(cpp) ~", basicpmt))
+basicpmt <- lm_robust(basicpmt, data_train, weights = mult, se_type = "stata", clusters = region)
+bpmt <- tibble(yhat = exp(basicpmt$fitted.values),
+               y = exp(unlist(model.frame(basicpmt)[basicpmt$outcome])),
+               w = data_train$mult / sum(data_train$mult))  
+
+basicpmt_test <- predict(basicpmt, newdata = data_test)
+bpmt_test <- tibble(yhat = exp(basicpmt_test),
+               y = data_test$cpp,
+               w = data_test$mult / sum(data_test$mult)) 
+
+ggplot(bpmt) +
+  geom_density(aes(x = y / 12, weight = w), color = "firebrick") +
+  geom_vline(xintercept = z-500, color = "gray", alpha = 0.8) +
+  geom_ribbon(data = subset(with(dens, data.frame(x,y)), x < z), aes(x = x, ymax = y), ymin = 0, fill = "firebrick", alpha = 0.3) +
+  annotate(geom = "text", x = z - 8000, y = 0.000013, label = paste0("F(", format(z, digits = 1, big.mark = ","), ") = ", q), hjust = "outward", size = 3, color = "firebrick") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(x = "Monthly per capita consumption",
+       y = NULL,
+       title = "Uganda LSMS-ISA, Training Data") +
+  coord_cartesian(xlim = c(0, 40000), ylim = c(0, 0.00004)) +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        axis.text.y = element_blank())
+
+
+```
+]
+
+.pull-right[
+# How it's going
+```{r poverty_prediction, echo = FALSE, warning = FALSE, fig.dim = c(5,5)}
+z = my_quantile(data_test$cpp / 12, w = data_test$w, p = q)
+dens = density(data_test$cpp / 12, weights = data_test$w)
+z_hat = my_quantile(bpmt_test$yhat / 12, w = bpmt_test$w, p = q)
+dens2 = density(bpmt_test$yhat / 12, weights = bpmt_test$w)
+
+plot2 <- ggplot(bpmt_test) +
+  geom_density(aes(x = y / 12, weight = w), color = "gray") +
+  geom_vline(xintercept = z-500, color = "gray", alpha = 0.8) +
+  geom_ribbon(data = subset(with(dens, data.frame(x,y)), x < z), aes(x = x, ymax = y), ymin = 0, fill = "gray", alpha = 0.3) +
+  annotate(geom = "text", x = z - 8000, y = 0.000013, label = paste0("F(", format(z, digits = 1, big.mark = ","), ") = ", q), hjust = "outward", size = 2.5) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(x = "Monthly per capita consumption",
+       y = NULL,
+       title = "Uganda LSMS-ISA Testing Data",
+       subtitle = "True income distribution vs. predicted based on basic PMT model") +
+  coord_cartesian(xlim = c(0, 40000), ylim = c(0, 0.00004)) +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        axis.text.y = element_blank())
+
+plot2 +
+  geom_density(aes(x = yhat / 12, weight = w), color = "firebrick") +
+  geom_vline(xintercept = z_hat-200, color = "firebrick", alpha = 0.8) +
+  geom_ribbon(data = subset(with(dens2, data.frame(x,y)), x < z_hat), aes(x = x, ymax = y), ymin = 0, fill = "firebrick", alpha = 0.3)+
+  annotate("text", x = z_hat - 3000, y = 0.00003, label = paste0("F(", format(z_hat, digits = 1, big.mark = ","), ") = ", q), hjust = "outward", size = 2.5, color = "firebrick")
+  
+
+
+  
+```
+
+]
+
+- Fixing the poverty line at 14,925 is too low to reach the targeted 20 percent in the testing data.
+- Fixing the poverty rate at 16,063 is too high to reach the targeted 20 percent in the testing data.
+- Brown et al. look at both and recommend in practice to fix the poverty rate (focus on exclusion error), Verme fixes poverty line and compares model performance when poverty line changes. 
+
+---
+## A combined framework (Brown et al. & Verme)
+
+1. **Modelling**:
+    $$ 
+    \begin{align}
+    y_i = \alpha + \beta x_i + \varepsilon_i \\\\
+    1(y_i \leq z) = \alpha' + \beta' x_i + \epsilon_i
+    \end{align}
+    $$
+Choice of outcome (consumption or poverty) and model (Verme: OLS/Logit + Random Forest and LASSO): 6 models
+
+2. **Prediction** (out of sample):
+    $$ 
+    \begin{align}
+    \hat{y_i} = \hat{\alpha} + \hat{\beta} x_i \\\\
+    \hat{p}_i = P[y_i \leq z | x_i] = \hat{\alpha}' + \hat{\beta}' x_i + \epsilon_i
+    \end{align}
+    $$
+---
+
+<ol start=3> 
+<li> **Classification**:
+Use the predictions to classify into poor or non-poor
+    $$ 
+    \begin{align}
+    y_i \rightarrow \text{poor if }&\enspace \hat{y_i} \leq z \\\\
+    1(y_i \leq z) \rightarrow \text{poor if }&\enspace \hat{p}_i \geq \tau
+    \end{align}
+    $$
+$\tau$ is a pre-specified probability cut-off (unclear what Verme uses, I try $\tau  = 0.5$).
+
+--
+
+<script>
+   function setColor(color){ 
+    document.getElementById("TN").style.backgroundColor='white';
+    document.getElementById("FP").style.backgroundColor='white';
+    document.getElementById("TP").style.backgroundColor='green';
+    document.getElementById("FN").style.backgroundColor='red';
+};
+</script>
+
+<script>
+   function setColor2(color){ 
+    document.getElementById("TP").style.backgroundColor='white';
+    document.getElementById("FN").style.backgroundColor='white';
+    document.getElementById("TN").style.backgroundColor='green';
+    document.getElementById("FP").style.backgroundColor='red';
+};
+</script>
+
+<table>
+    <tr>
+      <td> <td>
+      <th> Predicted Non-Poor <th>
+      <th> Predicted Poor <th>
+    <tr>
+    <tr>
+      <th> Real Non-Poor <th>
+      <td id="TN">True Negative (TN)<td>
+      <td id="FP">False Positive (FP)<td>
+    <tr>
+    <tr>
+      <th> Real Poor <th>
+      <td id="FN">False Negative (FN)<td>
+      <td id="TP">True Positive (TP)<td>
+</table>
+
+To evaluate different models we need a targeting measure (Verme: "*objective function*").  
+Typically we use the mean squared error: $\frac{1}{N}\sum_{i=1}^N(y_i - \hat{y}_i)^2$. But here we do not care about all errors equally. Instead, formulate targeting measure in terms of coverage of program.
+
+Verme: "coverage rate" (= 1 - Exclusion Error Rate, $1-\frac{\sum 1(\hat{y}_i > z | y_i \leq z)}{\sum 1(y_i\leq z)}$) <input id="button1" type="button" value="show" onclick="setColor('red')">  
+Verme: "leakage rate" (= Inclusion Error Rate, $\frac{\sum 1(y_i > z | \hat{y}\leq z)}{\sum 1(\hat{y}_i \leq z)}$)<input id="button2" type="button" value="show"  onclick="setColor2('red')">
+
+---
+# Verme does what
