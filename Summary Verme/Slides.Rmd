@@ -6,7 +6,7 @@ institute: "Vrije Universiteit Amsterdam"
 date: "11 June 2021 (last updated: `r format(Sys.Date(), '%d %B %Y')`)"
 output: 
   xaringan::moon_reader:
-    css: [default, metropolis]
+    css: [default]
     nature: 
       countIncrementalSlides: false
     
@@ -14,7 +14,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-pacman::p_load(xaringan, tidyverse, estimatr, latex2exp)
+pacman::p_load(xaringan, tidyverse, estimatr, latex2exp, plotly, reactable, devtools)
 ```
 
 ```{r data, include = FALSE}
@@ -35,9 +35,9 @@ data_test = data[-index, ] %>%
   mutate(w = mult / sum(mult))
 ```
 
-## Why Targeting 
+# Why Targeting 
 .pull-left[
-```{r plot_povertylines, echo=FALSE, warning=FALSE, fig.dim=c(5, 5)}
+```{r plot_povertylines, echo=FALSE, warning=FALSE, fig.dim=c(7, 7)}
 # Ideas. Make this a shiny plot and change the poverty line and the graph.
 
 my_quantile <- function(x, w, p){
@@ -55,7 +55,7 @@ plot1 <- ggplot(data_train) +
   geom_density(aes(x = cpp / 12, weight = w), color = "black") +
   geom_vline(xintercept = z, color = "red", alpha = 0.8) +
   geom_ribbon(data = subset(with(dens, data.frame(x,y)), x < z), aes(x = x, ymax = y), ymin = 0, fill = "gray", alpha = 0.5) +
-  annotate(geom = "text", x = z + 1000, y = 0.00001, label = parse(text = TeX('$F(z) = \\sum(y_i \\leq z)$')), hjust = "inward") +
+  annotate(geom = "text", x = z + 1000, y = 0.00001, label = parse(text = latex2exp::TeX('$F(z) = \\sum(y_i \\leq z)$')), hjust = "inward") +
   annotate(geom = "text", x = z + 1000, y = 0.000008, label = paste0("F(", format(z, digits = 1, big.mark = ","), ") = ", q), color = "red", hjust = "inward") +
   scale_x_continuous(labels = scales::comma) +
   labs(x = "Monthly per capita consumption",
@@ -78,12 +78,18 @@ plot1
 > Absolute poverty (line) or relative poverty (rate)
 
 - The relevant measure may not be available for the entire sample `r emo::ji("cry")`
+- The relation between poverty line and poverty rate may be unknown `r emo::ji("cry")`
 ]
+
+???
+- Income distribution of the Uganda LSMS-ISA Training dataset (random subset of 50%).
+- If we know the income distribution we can set the poverty rate such that it exactly encompasses the chosen poverty line.
+But, if we do not know the income distribution we need to fix one of the two and the predicted distribution may be off (next slide).
 
 ---
 
 .pull-left[
-# How it started 
+## How it started 
 ```{r plot_povertylines2, echo=FALSE, fig.dim=c(5,5), warning=FALSE}
 # Linear regression with robust standard errors (Stata style), not yet clustered at PSU level (where is PSU variable in WB data?)
 basicpmt <- paste("toilet_flush", "toilet_pit", "floor_finished", "wall_finished", 
@@ -124,7 +130,7 @@ ggplot(bpmt) +
 ]
 
 .pull-right[
-# How it's going
+## How it's going
 ```{r poverty_prediction, echo = FALSE, warning = FALSE, fig.dim = c(5,5)}
 z = my_quantile(data_test$cpp / 12, w = data_test$w, p = q)
 dens = density(data_test$cpp / 12, weights = data_test$w)
@@ -160,12 +166,19 @@ plot2 +
 
 ]
 
-- Fixing the poverty line at 14,925 is too low to reach the targeted 20 percent in the testing data.
-- Fixing the poverty rate at 16,063 is too high to reach the targeted 20 percent in the testing data.
+- Fix poverty line at 14,925 is too low to reach the targeted 20 percent in the testing data.
+- Fix poverty rate at 16,063 (for 20 percent) is too high to reach the targeted 20 percent.
+
+???
+- Left is observed training data income distribution. Right is predicted income distribution for testing data, but the true underlying income distribution is not observed.
+- Again LSMS-ISA Uganda. OLS model like in Brown et al.
 - Brown et al. look at both and recommend in practice to fix the poverty rate (focus on exclusion error), Verme fixes poverty line and compares model performance when poverty line changes. 
 
 ---
-## A combined framework (Brown et al. & Verme)
+name: modelling
+
+# A combined framework 
+### Brown et al. & Verme
 
 1. **Modelling**:
     $$ 
@@ -174,7 +187,7 @@ plot2 +
     1(y_i \leq z) = \alpha' + \beta' x_i + \epsilon_i
     \end{align}
     $$
-Choice of outcome (consumption or poverty) and model (Verme: OLS/Logit + Random Forest and LASSO): 6 models
+Choice of outcome (consumption or poverty) and model (Verme: OLS/Logit + [Random Forest](#randomforest) and [LASSO](#lasso))<sup>1</sup>: 6 models
 
 2. **Prediction** (out of sample):
     $$ 
@@ -183,10 +196,23 @@ Choice of outcome (consumption or poverty) and model (Verme: OLS/Logit + Random 
     \hat{p}_i = P[y_i \leq z | x_i] = \hat{\alpha}' + \hat{\beta}' x_i + \epsilon_i
     \end{align}
     $$
----
 
-<ol start=3> 
-<li> **Classification**:
+.footnote[
+[1] This is the part where Brown et al. compare OLS, quantile regression, *"poverty-weighted least-square"* for basic and extended set of covariates.
+]
+
+???
+- Point for discussion: how important is training and testing versus simply estimating the model.
+- Smaller point, Verme splits error term into a random error and a modelling error, but those are not separately identifiable.
+
+---
+## A combined framework (cont.)
+1. Modelling: $y_i = \alpha + \beta x_i + \varepsilon_i$
+
+2. Prediction: $\hat{y_i} = \hat{\alpha} + \hat{\beta} x_i$
+<hr>
+
+3. **Classification**:
 Use the predictions to classify into poor or non-poor
     $$ 
     \begin{align}
@@ -196,7 +222,9 @@ Use the predictions to classify into poor or non-poor
     $$
 $\tau$ is a pre-specified probability cut-off (unclear what Verme uses, I try $\tau  = 0.5$).
 
---
+---
+
+name: classificationerrors
 
 <script>
    function setColor(color){ 
@@ -216,6 +244,9 @@ $\tau$ is a pre-specified probability cut-off (unclear what Verme uses, I try $\
 };
 </script>
 
+# All classifications will have errors
+Poverty Confusion Matrix
+
 <table>
     <tr>
       <td> <td>
@@ -234,10 +265,182 @@ $\tau$ is a pre-specified probability cut-off (unclear what Verme uses, I try $\
 </table>
 
 To evaluate different models we need a targeting measure (Verme: "*objective function*").  
-Typically we use the mean squared error: $\frac{1}{N}\sum_{i=1}^N(y_i - \hat{y}_i)^2$. But here we do not care about all errors equally. Instead, formulate targeting measure in terms of coverage of program.
 
 Verme: "coverage rate" (= 1 - Exclusion Error Rate, $1-\frac{\sum 1(\hat{y}_i > z | y_i \leq z)}{\sum 1(y_i\leq z)}$) <input id="button1" type="button" value="show" onclick="setColor('red')">  
 Verme: "leakage rate" (= Inclusion Error Rate, $\frac{\sum 1(y_i > z | \hat{y}\leq z)}{\sum 1(\hat{y}_i \leq z)}$)<input id="button2" type="button" value="show"  onclick="setColor2('red')">
 
+And some [additional measures](#measures)
+
+???
+We need a way to evaluate the different predictions. Typically we use the mean squared error: $\frac{1}{N}\sum_{i=1}^N(y_i - \hat{y}_i)^2$. But here we do not care about all errors equally. Instead, formulate targeting measure in terms of coverage of program.
+
 ---
-# Verme does what
+
+# Verme: Data and Results
+- 7062 households (3482 in testing data). 
+- 6 models (OLS, Logit, Random Forest x2 , LASSO x2) at *"simplest Stata specification."*
+- Simplest consumption model: gender, age, marital status and skills of the head of the household, household size and urban-rural location
+
+```{r vermeplot, include = FALSE, warning = FALSE, echo=FALSE, fig.align='center', fig.dim=c(5,5)}
+verme_results <- tibble(Value = c(0.40, 0.33, 0.40, 0.30, 0.35, 0.30,
+                                  0.24 , 0.34, 0.24, 0.31, 0.36, 0.31,
+                                  0.70, 0.64, 0.70, 0.68, 0.62, 0.68,
+                                  0.68, 0.64, 0.70, 0.68, 0.62, 0.68),
+                        Model = rep(c("OLS", "Random Forest", "LASSO",
+                                      "Logit", "Random Forest", "LASSO"), 4),
+                        Measure = c(rep("Undercoverage (EER)", 6), rep("Leakage (IER)", 6),
+                                    rep("Precision", 6), rep("Accuracy", 6)),
+                        Outcome = rep(c(rep("Continuous", 3), rep("Binary", 3)), 4))
+
+vermeplot <- verme_results %>% 
+  ggplot(aes(x = value, y = model, color = measure)) +
+  geom_point() +
+  facet_wrap("outcome", nrow = 2, scales = "free_y", strip.position = "top") +
+  labs(y = NULL, x = NULL, color = NULL) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# ggplotly(vermeplot, tooltip = "color", dynamicTicks = FALSE)
+
+```
+
+```{r vermetable, }
+verme_results_pivot <- verme_results %>% pivot_wider(names_from = c("Outcome", "Model"), values_from = "Value")
+
+reactable(verme_results_pivot, 
+          columns = list(Continuous_OLS = colDef(name = "OLS"),
+                         `Continuous_Random Forest` = colDef(name = "Random Forest"),
+                         Continuous_LASSO = colDef(name = "LASSO"),
+                         Binary_Logit = colDef(name = "Logit"),
+                         `Binary_Random Forest` = colDef(name = "Random Forest"),
+                         Binary_LASSO = colDef(name = "LASSO"),
+                         Measure = colDef(name = "Measure", minWidth = 140)),
+          columnGroups = list(colGroup(name = "Continuous", columns = c("Continuous_OLS", "Continuous_Random Forest", "Continuous_LASSO")),
+                              colGroup(name = "Binary", columns = c("Binary_Logit", "Binary_Random Forest", "Binary_LASSO"))),
+          defaultColDef = colDef(align = "left", headerStyle = list(background = "#f7f7f8")),
+          bordered = T,
+          highlight = T,
+          defaultPageSize = 2)
+```
+
+
+???
+- You can tell that it is a working paper...
+- Undisclosed middle-income-country
+- Poverty line set at median value. But unclear how exactly, probably look at the median value of the training data (or the entire data?).
+- Points to discuss: with so few variables, using regularization techniques like LASSO and Random Forest makes little sense.
+- Brown et al. had IER of 0.2-0.35 and EER of 0.25-0.45 for poverty line at 40 percent.
+
+---
+# Verme: Coverage Curves
+```{r coverage_curves, fig.retina=0.9, fig.align='center'}
+knitr::include_graphics("Verme_CoverageCurves.png")
+```
+
+???
+- Verme plots coverage (1-EER) and leakage (IES) rate for different values of the poverty line for all three models. Unclear results, most clear for binary outcome and random forest dominated by logit and lasso.
+- Question: Is this the right comparison? The poverty line does not vary as much so it seems there are other parameters for which we would like to know how the dominance of models varies. Most notably we would want first a measure of precision, no?
+
+---
+# Application: Uganda LSMS
+
+- 2744 observations and split them equally into training and testing data.
+
+- For fixed poverty line at $z=F^{-1}(0.2)$ and fixed poverty rate at H=0.2, I calculate Headcount, IER and EER or TER using the basic and extended model like in Brown et al. and add LASSO and Random Forest models.
+
+- Make 500 repeated testing - training splits and re-estimate the models to get bootstrapped precisions for the Headcount, IER, EER and TER prediction errors.
+
+- [Many limitations and to-do's](#limitations)
+
+???
+I was not convinced by the comparisons in the Verme paper. So, I did it again for the Uganda LSMS-ISA dataset which is used in the Brown et al. paper. The dataset has 2744 observations after cleaning everything, attempting to do it exactly like the Brown et al. paper. There are a couple of limitations (most importantly survey weights) but its a start.
+- Addition to Brown et al. Add machine learning techniques (LASSO and Random Forest) and divide into testing and training.
+- Addition to Verme. Use a more sophisticated consumption model where the ML techniques may have an advantage. Although it would still be better to have interaction terms and polynomials.
+- And then, I also get estimates of the precision of the predictions with the competing algorithms.
+
+---
+name: myresults
+
+```{r uganda_application, echo = FALSE, warning = FALSE}
+results = readRDS("../Replication Brown, Ravallion, van de Walle/Data/prepared/results")
+bootstraps = readRDS("../Replication Brown, Ravallion, van de Walle/Data/prepared/boot_results")
+
+```
+
+## My results
+```{r uganda_results, echo = FALSE}
+plot = results %>% 
+  filter(z == 0.2) %>% 
+  ggplot(aes(x = value, y = measure, colour = model, group = model)) +
+  facet_wrap(facets = c("covariates"), ncol = 2, nrow = 2) +
+  # Print confidence intervals
+  ggstance::geom_pointrangeh(aes(xmin = ci_low, xmax = ci_high), position = position_dodge(width = 0.2)) +
+  scale_color_brewer(type = "qual", palette = "Pastel1") +
+  labs(y = NULL, x = NULL, color = NULL, title = "Performance of different targeting methods." ) +
+  theme_minimal()
+ 
+plot
+ 
+ 
+  #   guides(color = guide_legend(label.position = "top", title.position = "top", direction = "horizontal", order = 1),
+  #          alpha = FALSE) 
+
+```
+
+
+---
+# Questions
+
+- In-sample versus out-of-sample testing. Is this crucial? Verme says: 
+    > The choice of the optimal model depends on the location of the poverty line, the choice of objective function and the particular income distribution at hand. Unlike current practices, it is essential to test alternative models and perform stochastic dominance analysis before selecting the optimal model 
+
+How can we do this if we don't have the data and need to do out-of-sample validation?
+
+- How important is it to consider the precision of targeting models? Bootstrap reflects sampling uncertainty, but what if we have data of whole population?
+
+---
+name: measures
+
+### More Targeting Measures
+
+- Specificity Rate = 1 - Leakage Rate
+- Precision = TP/(TP+FP) *share of all predicted poor that are poor*
+- Accuracy = (TP+TN)/(TP+TN+FP+FN) *share of all observations correctly classified*
+- F2 = $5*TP/(5*TP+4*FN+FP)$ `r emo::ji("confused")`
+- Chi2 = $\sum\frac{(O_{ij}-E_{ij})^2}{E_{ij}}$ `r emo::ji("wow")`
+- Chi2 likelihood ratio
+
+ <hr>
+
+[Back to presentation](#classification)
+
+---
+name: lasso
+
+### LASSO Algorithm
+
+<hr>
+
+[Back to presentation](#modelling)   
+[To Random Forest](#randomforest)
+
+---
+name: randomforest
+
+### Random Forest Algorithm
+
+<hr>
+
+[Back to presentation](#modelling)   
+[To LASSO](#lasso)
+
+---
+name: limitations
+
+### Limitations of Uganda Application
+- Survey weights are not used (not trivial with LASSO and Random Forest)
+- Clustering at region (ok) and PSU level (where in data?)
+- Correct bootstraps? Some people train on full sample and validate on sub-sample. I randomly split data but could also sample random subsets. Point estimate, first draw or average of bootstraps?
+
+<hr>
+[To results of application](#myresults)
