@@ -124,16 +124,16 @@ cross = cross2(list(z0.2 = 0.2, z0.4 =  0.4), list(basic = basicpmt, big = bigpm
   setNames(c("z2basic", "z4basic", "z2big", "z4big"))
 
 # Collect Results formula
-my_collect <- function(data, cross){
+my_collect <- function(data, cross, testsplit){
   results = bind_rows(
     # OLS Estimation
-    map_dfr(cross, ~my_estim(data, formula(paste("log(cpp) ~", .x[[2]])), .x[[1]], testsplit = TRUE, nobeta = TRUE, model = "ols")) %>% 
+    map_dfr(cross, ~my_estim(data, formula(paste("log(cpp) ~", .x[[2]])), .x[[1]], testsplit = testsplit, nobeta = TRUE, model = "ols")) %>% 
       mutate(z = rep(c(0.2, 0.4), 2), covariates = c("Basic", "Basic", "Extended", "Extended"), model = "OLS"),
     # Random Forest Estimation
-    forest = map_dfr(cross, ~my_estim(data, formula(paste("log(cpp) ~", .x[[2]])), .x[[1]], testsplit = TRUE, nobeta = TRUE, model = "forest")) %>% 
+    forest = map_dfr(cross, ~my_estim(data, formula(paste("log(cpp) ~", .x[[2]])), .x[[1]], testsplit = testsplit, nobeta = TRUE, model = "forest")) %>% 
       mutate(z = rep(c(0.2, 0.4), 2), covariates = c("Basic", "Basic", "Extended", "Extended"), model = "Random Forest"),
     # LASSO Estimation
-    lasso = map_dfr(cross, ~my_estim(data, formula(paste("log(cpp) ~", .x[[2]])), .x[[1]], testsplit = TRUE, nobeta = TRUE, model = "lasso")) %>% 
+    lasso = map_dfr(cross, ~my_estim(data, formula(paste("log(cpp) ~", .x[[2]])), .x[[1]], testsplit = testsplit, nobeta = TRUE, model = "lasso")) %>% 
       mutate(z = rep(c(0.2, 0.4), 2), covariates = c("Basic", "Basic", "Extended", "Extended"), model = "LASSO")
   )
   
@@ -142,20 +142,26 @@ my_collect <- function(data, cross){
 }
 
 ### Estimation ----
+results_insample = my_collect(data, cross, testsplit = FALSE) %>% rename("value_insample" = value)
+
 set.seed(1896)
 index = sample(seq_len(nrow(data)), size = round(nrow(data)*0.5))
-results = my_collect(data %>% mutate(test = row_number() %in% index), cross)
+results = my_collect(data %>% mutate(test = row_number() %in% index), cross, testsplit = TRUE)
+results = inner_join(results, results_insample, by = c("z", "covariates", "model", "measure"))
 
-## Bootstrapping
+## Bootstrapping. 500 random splits in train - test data and re-estimate targeting measures.
 plan(multisession)
 nboot = 500
 
 boot_index = map(1:nboot, ~sample(seq_len(nrow(data)), size = round(nrow(data)*0.5)))
 boot_results = future_map_dfr(boot_index, ~my_collect(data %>% mutate(test = row_number() %in% .x), cross), .options = furrr_options(seed = 07062019))
 boot_ci = boot_results %>% group_by(z, covariates, model, measure) %>% 
-  summarise(ci_low = quantile(value, 0.05), ci_high = quantile(value, 0.95), .groups = "drop")
+  summarise(mean = mean(value), ci_low = quantile(value, 0.05), ci_high = quantile(value, 0.95), .groups = "drop")
 
 results = inner_join(results, boot_ci, by = c("z", "covariates", "model", "measure"))
+
+## Out-of-bag bootstrap (estimate the model on the full dataset, then test on 500 fifty percent samples)
+
 
 ### Save Results ----
 # Targeting Measure: H, IER, EER, TER
@@ -163,4 +169,4 @@ results = inner_join(results, boot_ci, by = c("z", "covariates", "model", "measu
 # Covariates: basic, extended, (incl. polynomials+interactions)
 # Model: OLS, LASSO, Random Forest
 saveRDS(results, "Replication Brown, Ravallion, van de Walle/Data/prepared/results")
-saveRDS(results, "Replication Brown, Ravallion, van de Walle/Data/prepared/boot_results")
+saveRDS(boot_results, "Replication Brown, Ravallion, van de Walle/Data/prepared/boot_results")

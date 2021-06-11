@@ -3,7 +3,7 @@ title: "Which Model for Poverty Prediction"
 subtitle: "(Working Paper by Paolo Verme 2020)"
 author: "Philipp Kollenda"
 institute: "Vrije Universiteit Amsterdam"
-date: "11 June 2021 (last updated: `r format(Sys.Date(), '%d %B %Y')`)"
+date: "18 June 2021 `r if(Sys.Date()!='2021-06-18'){paste0('(last updated: ', format(Sys.Date(), '%d %B %Y'), ')')}`"
 output: 
   xaringan::moon_reader:
     css: [default]
@@ -11,7 +11,6 @@ output:
       countIncrementalSlides: false
     
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 pacman::p_load(xaringan, tidyverse, estimatr, latex2exp, plotly, reactable, devtools)
@@ -369,22 +368,35 @@ bootstraps = readRDS("../Replication Brown, Ravallion, van de Walle/Data/prepare
 
 ## My results
 ```{r uganda_results, echo = FALSE}
-plot = results %>% 
-  filter(z == 0.2) %>% 
-  ggplot(aes(x = value, y = measure, colour = model, group = model)) +
-  facet_wrap(facets = c("covariates"), ncol = 2, nrow = 2) +
+results %>% 
+  filter(z == 0.2, measure != "H") %>% 
+  mutate(covariates = paste(covariates, "\n Covariates")) %>% 
+  mutate(measure = fct_recode(measure, "Exclusion Error Rate" = "EER", "Inclusion Error Rate" = "IER", "Targeting Error Rate" = "TER")) %>% 
+  ggplot(aes(x = mean, y = fct_rev(covariates), colour = model, group = model)) +
+  facet_wrap(facets = c("measure"), ncol = 3, scales = "free") +
   # Print confidence intervals
   ggstance::geom_pointrangeh(aes(xmin = ci_low, xmax = ci_high), position = position_dodge(width = 0.2)) +
-  scale_color_brewer(type = "qual", palette = "Pastel1") +
-  labs(y = NULL, x = NULL, color = NULL, title = "Performance of different targeting methods." ) +
-  theme_minimal()
- 
-plot
- 
- 
-  #   guides(color = guide_legend(label.position = "top", title.position = "top", direction = "horizontal", order = 1),
-  #          alpha = FALSE) 
+  geom_point(aes(x = value_insample), shape = 3, color = "black", position = position_dodge(width = 0.2)) +
+  scale_color_brewer(type = "qual", palette = "Pastel2") +
+  labs(y = NULL, x = NULL, color = NULL, title = "Performance of different targeting methods (z=0.2).",
+       caption = "Average of bootstrap estimates and 90% confidence intervals, constructed with 500 random train / test splits.") +
+  guides(color = guide_legend(label.position = "top", direction = "horizontal", order = 1)) +
+  theme_minimal() +
+  theme(legend.position = "bottom", panel.grid.minor.x = element_blank())
+```
+[Results for z=0.4](#ownz4results)
 
+### Poverty rate at predicted poverty lines
+```{r hresults}
+results %>% filter(measure == "H", covariates == "Basic") %>% mutate(colorcode = if_else(mean-z<0, "red", "green"))  %>% 
+  ggplot(aes(x = mean, y = model)) + 
+  geom_vline(xintercept = c(0.2, 0.4), color = "black") +
+  geom_pointrange(aes(xmin = z, xmax = mean, color = colorcode), shape = 18, size = 1) +
+  scale_color_manual(values = c("darkgreen", "firebrick")) +
+  labs(y = "Model", x = "Poverty rate: targeted versus result (at 0.2 or 0.4)",
+       title = "Fixing the poverty line results in an underestimated poverty rate for low poverty rates.") +
+  theme_minimal() +
+  theme(legend.position = "none", panel.grid.major.y = element_blank(), title = element_text(size = 9))
 ```
 
 
@@ -444,3 +456,27 @@ name: limitations
 
 <hr>
 [To results of application](#myresults)
+
+---
+name: ownz4results
+
+## My results
+```{r uganda_results, echo = FALSE}
+results %>% 
+  filter(z == 0.4, measure != "H") %>% 
+  mutate(covariates = paste(covariates, "\n Covariates")) %>% 
+  mutate(measure = fct_recode(measure, "Exclusion Error Rate" = "EER", "Inclusion Error Rate" = "IER", "Targeting Error Rate" = "TER")) %>% 
+  ggplot(aes(x = mean, y = fct_rev(covariates), colour = model, group = model)) +
+  facet_wrap(facets = c("measure"), ncol = 3, scales = "free") +
+  # Print confidence intervals
+  ggstance::geom_pointrangeh(aes(xmin = ci_low, xmax = ci_high), position = position_dodge(width = 0.2)) +
+  geom_point(aes(x = value_insample), shape = 3, color = "black", position = position_dodge(width = 0.2)) +
+  scale_color_brewer(type = "qual", palette = "Pastel2") +
+  labs(y = NULL, x = NULL, color = NULL, title = "Performance of different targeting methods (z=0.4).",
+       caption = "Average of bootstrap estimates and 90% confidence intervals, constructed with 500 random train / test splits.") +
+  guides(color = guide_legend(label.position = "top", direction = "horizontal", order = 1)) +
+  theme_minimal() +
+  theme(legend.position = "bottom", panel.grid.minor.x = element_blank())
+```
+
+[Back to main results](#myresults)
