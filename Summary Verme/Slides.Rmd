@@ -186,7 +186,7 @@ name: modelling
     1(y_i \leq z) = \alpha' + \beta' x_i + \epsilon_i
     \end{align}
     $$
-Choice of outcome (consumption or poverty) and model (Verme: OLS/Logit + [Random Forest](#randomforest) and [LASSO](#lasso))<sup>1</sup>: 6 models
+Choice of outcome (consumption or poverty) and model (Verme: OLS/Logit + Random Forest and LASSO)<sup>1</sup>: 6 models
 
 2. **Prediction** (out of sample):
     $$ 
@@ -219,7 +219,7 @@ Use the predictions to classify into poor or non-poor
     1(y_i \leq z) \rightarrow \text{poor if }&\enspace \hat{p}_i \geq \tau
     \end{align}
     $$
-$\tau$ is a pre-specified probability cut-off (unclear what Verme uses, I try $\tau  = 0.5$).
+$\tau$ is a pre-specified probability cut-off (unclear what Verme uses).
 
 ---
 
@@ -273,6 +273,9 @@ And some [additional measures](#measures)
 ???
 We need a way to evaluate the different predictions. Typically we use the mean squared error: $\frac{1}{N}\sum_{i=1}^N(y_i - \hat{y}_i)^2$. But here we do not care about all errors equally. Instead, formulate targeting measure in terms of coverage of program.
 
+Exclusion Rate is share of true poor which are misclassified as non-poor. True poor are wrongly excluded.
+Inclusion Rate is share of predicted poor (Ravallion, true poor Verme) which are misclassified as poor. True non-poor are wrongly included.
+
 ---
 
 # Verme: Data and Results
@@ -303,7 +306,7 @@ vermeplot <- verme_results %>%
 
 ```
 
-```{r vermetable, }
+```{r vermetable}
 verme_results_pivot <- verme_results %>% pivot_wider(names_from = c("Outcome", "Model"), values_from = "Value")
 
 reactable(verme_results_pivot, 
@@ -345,7 +348,7 @@ knitr::include_graphics("Verme_CoverageCurves.png")
 
 - 2744 observations and split them equally into training and testing data.
 
-- For fixed poverty line at $z=F^{-1}(0.2)$ and fixed poverty rate at H=0.2, I calculate Headcount, IER and EER or TER using the basic and extended model like in Brown et al. and add LASSO and Random Forest models.
+- For fixed poverty line at $z=F^{-1}(0.2)$ and fixed poverty rate at H=0.2, I calculate Headcount, IER and EER or TER using the basic and extended OLS model like in Brown et al. and add LASSO and Random Forest models.
 
 - Make 500 repeated testing - training splits and re-estimate the models to get bootstrapped precisions for the Headcount, IER, EER and TER prediction errors.
 
@@ -367,7 +370,8 @@ bootstraps = readRDS("../Replication Brown, Ravallion, van de Walle/Data/prepare
 ```
 
 ## My results
-```{r uganda_results, echo = FALSE}
+
+```{r uganda_results, echo = FALSE, fig.align='center'}
 results %>% 
   filter(z == 0.2, measure != "H") %>% 
   mutate(covariates = paste(covariates, "\n Covariates")) %>% 
@@ -379,15 +383,20 @@ results %>%
   geom_point(aes(x = value_insample), shape = 3, color = "black", position = position_dodge(width = 0.2)) +
   scale_color_brewer(type = "qual", palette = "Pastel2") +
   labs(y = NULL, x = NULL, color = NULL, title = "Performance of different targeting methods (z=0.2).",
-       caption = "Average of bootstrap estimates and 90% confidence intervals, constructed with 500 random train / test splits.") +
+       caption = "Average of bootstrap estimates and 90% confidence intervals, constructed with 500 random train / test splits. Cross shows in-sample result.") +
   guides(color = guide_legend(label.position = "top", direction = "horizontal", order = 1)) +
   theme_minimal() +
   theme(legend.position = "bottom", panel.grid.minor.x = element_blank())
 ```
 [Results for z=0.4](#ownz4results)
 
+???
+Brown et al. had IER = 0.403, EER = 0.619 and TER 0.344 for poverty line at 20 percent.
+
+---
+
 ### Poverty rate at predicted poverty lines
-```{r hresults}
+```{r hresults, fig.align='center'}
 results %>% filter(measure == "H", covariates == "Basic") %>% mutate(colorcode = if_else(mean-z<0, "red", "green"))  %>% 
   ggplot(aes(x = mean, y = model)) + 
   geom_vline(xintercept = c(0.2, 0.4), color = "black") +
@@ -424,27 +433,7 @@ name: measures
 
  <hr>
 
-[Back to presentation](#classification)
-
----
-name: lasso
-
-### LASSO Algorithm
-
-<hr>
-
-[Back to presentation](#modelling)   
-[To Random Forest](#randomforest)
-
----
-name: randomforest
-
-### Random Forest Algorithm
-
-<hr>
-
-[Back to presentation](#modelling)   
-[To LASSO](#lasso)
+[Back to presentation](#classificationerrors)
 
 ---
 name: limitations
@@ -461,7 +450,7 @@ name: limitations
 name: ownz4results
 
 ## My results
-```{r uganda_results, echo = FALSE}
+```{r uganda_results4, echo = FALSE, fig.align='center'}
 results %>% 
   filter(z == 0.4, measure != "H") %>% 
   mutate(covariates = paste(covariates, "\n Covariates")) %>% 
@@ -470,7 +459,7 @@ results %>%
   facet_wrap(facets = c("measure"), ncol = 3, scales = "free") +
   # Print confidence intervals
   ggstance::geom_pointrangeh(aes(xmin = ci_low, xmax = ci_high), position = position_dodge(width = 0.2)) +
-  geom_point(aes(x = value_insample), shape = 3, color = "black", position = position_dodge(width = 0.2)) +
+  # geom_point(aes(x = value_insample), shape = 3, color = "black", position = position_dodge(width = 0.2)) +
   scale_color_brewer(type = "qual", palette = "Pastel2") +
   labs(y = NULL, x = NULL, color = NULL, title = "Performance of different targeting methods (z=0.4).",
        caption = "Average of bootstrap estimates and 90% confidence intervals, constructed with 500 random train / test splits.") +
@@ -479,4 +468,8 @@ results %>%
   theme(legend.position = "bottom", panel.grid.minor.x = element_blank())
 ```
 
+
 [Back to main results](#myresults)
+
+???
+Brown et al. had IER = 0.28, EER = 0.486 and TER 0.326 for poverty line at 40 percent.

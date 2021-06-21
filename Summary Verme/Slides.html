@@ -21,7 +21,7 @@ class: center, middle, inverse, title-slide
 ## (Working Paper by Paolo Verme 2020)
 ### Philipp Kollenda
 ### Vrije Universiteit Amsterdam
-### 18 June 2021 (last updated: 11 June 2021)
+### 18 June 2021 (last updated: 17 June 2021)
 
 ---
 
@@ -84,7 +84,7 @@ name: modelling
     1(y_i \leq z) = \alpha' + \beta' x_i + \epsilon_i
     \end{align}
     $$
-Choice of outcome (consumption or poverty) and model (Verme: OLS/Logit + [Random Forest](#randomforest) and [LASSO](#lasso))&lt;sup&gt;1&lt;/sup&gt;: 6 models
+Choice of outcome (consumption or poverty) and model (Verme: OLS/Logit + Random Forest and LASSO)&lt;sup&gt;1&lt;/sup&gt;: 6 models
 
 2. **Prediction** (out of sample):
     $$ 
@@ -117,7 +117,7 @@ Use the predictions to classify into poor or non-poor
     1(y_i \leq z) \rightarrow \text{poor if }&amp;\enspace \hat{p}_i \geq \tau
     \end{align}
     $$
-`\(\tau\)` is a pre-specified probability cut-off (unclear what Verme uses, I try `\(\tau  = 0.5\)`).
+`\(\tau\)` is a pre-specified probability cut-off (unclear what Verme uses).
 
 ---
 
@@ -171,6 +171,9 @@ And some [additional measures](#measures)
 ???
 We need a way to evaluate the different predictions. Typically we use the mean squared error: `\(\frac{1}{N}\sum_{i=1}^N(y_i - \hat{y}_i)^2\)`. But here we do not care about all errors equally. Instead, formulate targeting measure in terms of coverage of program.
 
+Exclusion Rate is share of true poor which are misclassified as non-poor. True poor are wrongly excluded.
+Inclusion Rate is share of predicted poor (Ravallion, true poor Verme) which are misclassified as poor. True non-poor are wrongly included.
+
 ---
 
 # Verme: Data and Results
@@ -204,7 +207,7 @@ We need a way to evaluate the different predictions. Typically we use the mean s
 
 - 2744 observations and split them equally into training and testing data.
 
-- For fixed poverty line at `\(z=F^{-1}(0.2)\)` and fixed poverty rate at H=0.2, I calculate Headcount, IER and EER or TER using the basic and extended model like in Brown et al. and add LASSO and Random Forest models.
+- For fixed poverty line at `\(z=F^{-1}(0.2)\)` and fixed poverty rate at H=0.2, I calculate Headcount, IER and EER or TER using the basic and extended OLS model like in Brown et al. and add LASSO and Random Forest models.
 
 - Make 500 repeated testing - training splits and re-estimate the models to get bootstrapped precisions for the Headcount, IER, EER and TER prediction errors.
 
@@ -222,9 +225,17 @@ name: myresults
 
 
 ## My results
-![](Slides_files/figure-html/uganda_results-1.png)&lt;!-- --&gt;
+
+&lt;img src="Slides_files/figure-html/uganda_results-1.png" style="display: block; margin: auto;" /&gt;
+[Results for z=0.4](#ownz4results)
+
+???
+Brown et al. had IER = 0.403, EER = 0.619 and TER 0.344 for poverty line at 20 percent.
+
+---
+
 ### Poverty rate at predicted poverty lines
-![](Slides_files/figure-html/hresults-1.png)&lt;!-- --&gt;
+&lt;img src="Slides_files/figure-html/hresults-1.png" style="display: block; margin: auto;" /&gt;
 
 
 ---
@@ -251,27 +262,7 @@ name: measures
 
  &lt;hr&gt;
 
-[Back to presentation](#classification)
-
----
-name: lasso
-
-### LASSO Algorithm
-
-&lt;hr&gt;
-
-[Back to presentation](#modelling)   
-[To Random Forest](#randomforest)
-
----
-name: randomforest
-
-### Random Forest Algorithm
-
-&lt;hr&gt;
-
-[Back to presentation](#modelling)   
-[To LASSO](#lasso)
+[Back to presentation](#classificationerrors)
 
 ---
 name: limitations
@@ -283,6 +274,18 @@ name: limitations
 
 &lt;hr&gt;
 [To results of application](#myresults)
+
+---
+name: ownz4results
+
+## My results
+&lt;img src="Slides_files/figure-html/uganda_results4-1.png" style="display: block; margin: auto;" /&gt;
+
+
+[Back to main results](#myresults)
+
+???
+Brown et al. had IER = 0.28, EER = 0.486 and TER 0.326 for poverty line at 40 percent.
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
