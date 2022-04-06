@@ -7,7 +7,7 @@ Data cleaning happens in "Replication Brown, Ravallion, van de Walle/Scripts/" a
 More interesting are the targeting predictions with traditional econometrics and some big data techniques. These happen in "Summary Verme/uganda_estimation.R"
 
 ### Presentation of results
-To look at the results see the html-based presentation at the link: 
+To look at the results see the html-based presentation at the link: https://regal-selkie-bf835b.netlify.app/#1 (deployed with Netifly, hence the strange name). 
 The (somewhat) interactive html-based presentation is created using CSS (via the xaringan package) in R Markdown. The code is in "Summary Verme/Slides.Rmd", but the repository needs to be copied to your local computer if you want to run the code. To see the resulting presentation better follow the link given above. 
 
 ## Replication Brown, Ravallion, van de Walle paper (A Poor Means Test, JDE 2018)
